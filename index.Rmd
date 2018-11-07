@@ -1,0 +1,183 @@
+---
+title: "8章　おわりに"
+author: "R. Ito"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: leonids
+    highlight: github
+---
+
+```{r setup, echo=FALSE}
+reticulate::use_python("/usr/local/bin/python3")
+```
+
+> ここまで読んだ読者は、重要な教師あり学習および教師なし学習の機械学習アルゴリズムの使い方がわかり、さまざまな機械学習問題を解くことができるようになっているはずだ。
+
+（いいね？）
+
+## 8.1 機械学習問題へのアプローチ
+
+- 問題を大きく捉えよう
+  - 機械学習はあくまで**意思決定プロセスの一部**
+- 機械学習の問題に取り組むときの課題は大きく分けて3つ
+  - **効果をどのように測定するか？**
+  - **データはあるか？**
+  - **ビジネスへの影響は？**
+- 効果をビジネス基準で測定できれば一番良いが難しい。
+  - 代案の一つは「**完全なモデルができたらどうなるか？**」と問うこと。
+    - 利益がわずかなら止めよう。
+    - 莫大な利益が見込めるなら取り組む価値がある。
+- パラメータチューングよりも、**新しい、多様なデータの取得**と**タスクの再構成**に労力をかけたほうが実りは多い。
+
+### 8.1.1 人間をループに組み込む
+
+- 機械学習が単純な場合だけしか自動化できないとしても、十分利益につながるケースはある。
+- **単純なケースは機械学習で自動的に、難しいケースは人間の判断に**、というのは良い戦略である。
+
+## 8.2 プロトタイプから運用システムへ
+
+- **解析チームが見つけた方法を、高性能向けの言語で再実装する**ということは良くある。
+  - PythonやRはアイデアの素早い実証には向いている。
+  - スケーラブルなシステム構築にはGo、Scala、C++、Javaなどを検討しよう。
+- 参考: [Machine Learning: The High Interest Credit Card of Technical Debt – Google AI](https://ai.google/research/pubs/pub43146)
+  - "Using the framework of technical debt, we note that it is remarkably easy to incur massive ongoing maintenance costs at the system level when applying machine learning. "
+  - 適当訳: 技術的負債なフレームワーク使うと機械学習運用するときに激ヤバなメンテナンスコスト簡単に発生するで。
+
+## 8.3 運用システムのテスト
+
+- **オフライン評価**...事前に集めたデータで評価する（本書で説明）。
+- **オンラインテスト**...**A/Bテスト**のように実際の環境でアルゴリズムを導入したシステムを評価する。もうちょっと複雑な方法に**バンディットアルゴリズム**がある。
+  - ざっくり解説
+    - **A/Bテスト**...ユーザーをランダムに割り当てて、結果を比べる。
+    - **バンディットアルゴリズム**...ユーザー割り当てにそれまでの評価結果を反映する。良い選択肢がより選ばれやすくなるので、機会損失の低減が見込める。
+      - **良い選択肢** を選ぶ方法によってバンディットアルゴリズムはさらに分岐する。代表的なのは**ε-greedy方策**。
+        - 確率εでランダムな選択（探索と呼ぶ）、1-εで良い選択肢の選択（活用と呼ぶ）を行う。
+        - ε = 1とすると常にランダムな選択をする = A/Bテストといっしょ
+
+## 8.4 独自Estimatorの構築
+
+- **`sklearn`にやりたい処理が実装されてない!!どうすれば!?**
+  - 無ければ作る
+  - しかし適当にやってはいけない
+  - 前処理がデータに依存するような場合（標準化とか）は、前処理を交差検証ループの中に組み込んでループの都度やらないと、過学習の危険性が高まる
+    - 訓練セットの情報をつかってテストセットの前処理をしてはいけない、ということ
+    
+- `sklearn`のパイプラインで扱えるクラスの作り方
+  - `BaseEstimator`を継承する
+  - 変換なら`TransformerMixin`、分類なら`ClassifierMixin`、回帰なら`RegressionMixin`を継承する。
+  - `__init__`、`fit`、`transform`、`predict`を実装する。
+  
+```{python}
+from sklearn.base import BaseEstimator, TransformerMixin
+
+class MyTransformer(BaseEstimator, TransformerMixin):
+  def __init__(self, first_parameter=1, second_parameter=2):
+    self.first_parameter = 1
+    self.second_parameter = 2
+    
+  def fit(self, X, y=None):
+    # ここでfitの挙動を定義
+    return self
+    
+  def transform(self, X):
+    X_transformed = X + 1
+    return X_transformed
+```
+
+- 参考リンク
+  - [sklearn準拠モデルの作り方 - Qiita](https://qiita.com/roronya/items/fdf35d4f69ea62e1dd91)
+
+## 8.5 ここからどこへ行くのか
+
+### 8.5.1 理論
+
+- ちゃんと理論的な部分もやろうな。
+- *The Elements of Statistical Learning*
+  - 邦題『統計的学習の基礎：データマイニング・理論・予測』
+  - 通称カステラ本。鈍器。
+- *Machine Learnig: An Algorithmic Perspective*
+  - 和書未完
+- *Pattern Recognition and Machine Learning*
+  - 邦題『パターン認識と機械学習』
+  - 通称PRML。鈍器。
+- *Machine Learning: A Probabilistic Perspective*
+  - 鈍器。
+
+### 8.5.2 他の機械学習フレームワークとパッケージ
+
+- 大規模なWebサービスやアプリケーションはJavaやC++で書かれていることが多い。
+- 統計モデルに興味がある...`statsmodel`
+  - 「どうしてもPythonがいい」という理由がなければRの方が良いかも…
+
+```{python}
+import numpy as np
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+
+# データ取得
+dat = sm.datasets.get_rdataset("mtcars").data
+
+# モデルの適用
+result = smf.ols('mpg ~ disp', data=dat).fit()
+
+# 結果の表示
+print(result.summary())
+```
+
+- `vowpal wabbit`...C++で記述された高速に動作するコマンドラインツール。
+  - Pythonのwrapperもある（けどインストールうまく行かなかった…）。
+- `MLlib`...Sparkの機械学習ライブラリ
+  - PythonからSpark使いたい...PySpark
+  - Rから...SparkRやsparklyr
+
+### 8.5.3 ランキング、推薦システム、その他学習
+
+- 本書で説明した回帰、分類、クラスタリング、信号成分分析以外のものについて。
+- ランキング
+  - 問い合わせに対して関連する順番で一連の答えを返す
+  - 例...検索エンジン
+- 推薦システム
+  - ユーザーの好みに応じて提案を行う
+  - 例...「この商品を買った人はこんな商品も買っています」
+
+### 8.5.4 確率モデル、推論、確率プログラミング
+
+- 実世界の問題は特有の構造を持つことが多い
+- **確率モデル**...特有の構造の確率的な表現
+- 確率プログラミング言語...確率モデルを表現し、パラメータ推定などが行える言語
+  - `PyMC`...PythonでMCMCが実行できるパッケージ
+  - Stan...独自の言語でモデルを記述するベイズ推定のソフト。多くの言語とインターフェースを持つ。R、Python、MATRAB、Julia、Stata、そしてコマンドライン。日本語の情報も多く、近年とても強い。
+    - WinBUGS...かつて主流だったベイズ推定のソフト。ギブスサンプリングを高速に行う。Windowsのみ。最近見かけない。
+    - JAGS...Just Another Gibbs Sampler。WinBUGSのオープンソース、マルチプラットフォーム版みたいなやつ。最近見かけない。
+
+### 8.5.5 ニューラルネットワーク
+
+- あまりに進歩が早いので参考文献をあげてもすぐに時代遅れになるであろう…
+
+### 8.5.6 大規模データセットへのスケール
+
+- データがメモリに乗りきらない…どうすれば…
+- **アウトオブコア学習**
+  - 1台のマシンでちょっとずつ読み込んで学習していく。
+  - データが大きいとめっちゃ時間かかる。
+  - すべてのアルゴリズムが実装できるわけではない。
+- **クラスタ並列化**
+  - Sparkが使えるなら使ったほうが簡単。
+  - VWでもできるらしい。
+
+### 8.5.7 名誉を得る
+
+- 繰り返し練習しよう。
+- Kaggleみたいなコンペは良い場所。
+
+## 8.6 結論
+
+> 機械学習が幅広いアプリケーションに対して有用で、実際に実装するのも簡単だ、ということを理解してもらえたと思う。今後もデータの解析を続けてほしい。ただし、問題の全体像を見ることを忘れずに。
+
+## カバー説明
+
+- アメリカオオサンショウウオ（hellbender salamander）
+- hellbenderは「地獄に向かうもの」という意味。一説にはその不気味な姿を見た入植者が地獄に戻ろうとしている悪魔の生き物と感じたから、とされている。
+- チュウゴクオオサンショウウオ、オオサンショウウオに続いて世界で3番目に大きな水性オオサンショウウオ。
+- 皮膚呼吸をするため、浅く流速の早い酸素の豊富な水辺を好むが、生息地近くでの農薬散布などの人間活動の増加により近年急速に数を減らす。
